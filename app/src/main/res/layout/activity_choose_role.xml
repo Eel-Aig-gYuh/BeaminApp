@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ChooseRole"
+    android:orientation="vertical"
+    android:background="@drawable/img_2">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="bottom">
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tôi là tài xế !"
+            android:id="@+id/driver"
+            android:padding="16dp"
+            android:layout_marginLeft="20dp"
+            android:layout_marginRight="20dp"
+            android:textColor="@color/white"
+            android:textFontWeight="2"
+            android:background="@color/colorPrimary">
+
+        </Button>
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tôi là khách hàng ! !"
+            android:id="@+id/customer"
+            android:padding="16dp"
+            android:layout_margin="20dp"
+            android:textFontWeight="2"
+            android:background="@color/colorPrimaryDark">
+
+
+        </Button>
+
+    </LinearLayout>
+
+</RelativeLayout>

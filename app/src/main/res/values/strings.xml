@@ -1,0 +1,43 @@
+<resources>
+    <string name="app_name">Uber</string>
+    <string name="register_text">Hãy bắt đầu tạo tài khoản của riêng bạn!</string>
+    <string name="first_name">Nhập tên ở đây: ...</string>
+    <string name="last_name">Nhập họ, chữ lót: ...</string>
+    <string name="phone_number">Số điện thoại: ...</string>
+    <string name="continue_text">Tiếp tục </string>
+    <string name="myApiKeys">AIzaSyAi0Kvr1N7tYWaIKNpSsHh81RWUzH68qWw</string>
+
+
+    <string name="title_activity_driver_home">DriverHomeActivity</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">Android Studio</string>
+    <string name="nav_header_subtitle">android.studio@android.com</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="menu_home">Trang chủ</string>
+    <string name="menu_sign_out">Thoát</string>
+    <string name="title_activity_maps">MapsActivity</string>
+    <string name="permission_require">required permission</string>
+    <string name="title_activity_home">HomeActivity</string>
+    <string name="menu_gallery">Gallery</string>
+    <string name="menu_slideshow">Slideshow</string>
+    <string name="drivers_not_found">Không tìm thấy xe, bạn đợi xí nhé ...</string>
+    <string name="not_found_key">Not found driver with key.</string>
+    <string name="welcome">Bạn muốn đi đâu ?</string>
+    <string name="choose_a_saved_place">Chọn một địa điểm đã lưu ...</string>
+    <string name="where_to">Bạn định đi đâu đấy?</string>
+    <string name="city_name_empty">Không tìm thấy địa điểm của bạn rồi...</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="menu_history">Lịch sử giao dịch</string>
+    <string name="menu_setting">Thông tin</string>
+    <string name="save">Lưu thông tin</string>
+    <string name="back">"Trở về "</string>
+    <string name="car_number">Biển số xe</string>
+    <string name="type_motorbike">Xe máy</string>
+    <string name="type_car">Xe hơi</string>
+
+
+</resources>
