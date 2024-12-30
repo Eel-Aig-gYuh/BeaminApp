@@ -112,8 +112,11 @@ public class DriverSettingActivity extends AppCompatActivity {
         mFirstName = mFirstNameField.getText().toString();
         mLastName = mLastNameField.getText().toString();
         mPhone = mPhoneField.getText().toString();
+        mCar = mCarField.getText().toString();
 
         int selectedId = mRadioGroup.getCheckedRadioButtonId();
+
+
 
         final RadioButton radioButton = (RadioButton) findViewById(selectedId);
 
@@ -127,7 +130,7 @@ public class DriverSettingActivity extends AppCompatActivity {
 
         Map userInfo = new HashMap();
         userInfo.put("firstName", mFirstName);
-        userInfo.put("firstName", mLastName);
+        userInfo.put("lastName", mLastName);
         userInfo.put("phoneNumber", mPhone);
         userInfo.put("car", mCar);
         userInfo.put("service", service);
@@ -192,7 +195,7 @@ public class DriverSettingActivity extends AppCompatActivity {
                         mFirstName = map.get("firstName").toString();
                         mFirstNameField.setText(mFirstName);
                     }
-                    if(map.get("firstName") != null){
+                    if(map.get("lastName") != null){
                         mLastName = map.get("lastName").toString();
                         mLastNameField.setText(mLastName);
                     }

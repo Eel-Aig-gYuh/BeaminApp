@@ -83,11 +83,18 @@ import java.util.Locale;
 import java.util.Map;
 
 public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, RoutingListener, LocationListener {
+    // update map period
     private GoogleMap mMap;
+    Location mLastLocation;
+    LocationRequest locationRequest;
+
+
+
+
     private FragmentDriverHomeBinding binding;
     // location
     private FusedLocationProviderClient fusedLocationProviderClient;
-    private LocationRequest locationRequest;
+
     private LocationCallback locationCallback;
     private boolean isFirstTime = true;
     SupportMapFragment mapFragment;
@@ -95,7 +102,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
     private ImageView mCustomerProfileImage;
     private TextView mCustomerName, mCustomerPhone, mCustomerDestination;
     private Button mRideStatus;
-    private GoogleApiClient mGoogleApiClient;
+    GoogleApiClient mGoogleApiClient;
 
     private int status = 0;
 
@@ -103,9 +110,8 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
     DatabaseReference onlineRef, currentUserRef, driversLocationRef;
     LatLng newPosition;
     private LatLng destinationLatLng;
-    Location mLastLoction;
     GeoFire geofire;
-    private String customerId = "", destination;
+    private String customerId = " ", destination;
 
     ValueEventListener onlineValueEventListener = new ValueEventListener() {
         @Override
@@ -136,8 +142,6 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         registerOnlineSystem();
     }
     private void registerOnlineSystem(){
-
-
         onlineRef.addValueEventListener(onlineValueEventListener);
     }
 
@@ -183,11 +187,12 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         // Toast.makeText(getContext(), "Debug đang chạy giao diện trên driver!", Toast.LENGTH_SHORT).show();
         init();
         getAssignedCustomer();
+
         return root;
     }
 
     private void endRide() {
-        mRideStatus.setText("Đã đón khách hàng...");
+        mRideStatus.setText("Kết thúc chuyến đi.");
         erasePolylines();
 
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
@@ -198,7 +203,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         DatabaseReference ref = FirebaseDatabase.getInstance().getReference("customerRequest");
         GeoFire geoFire = new GeoFire(ref);
         geoFire.removeLocation(customerId);
-        customerId="";
+        customerId=" ";
 
         if(pickupMarker != null){
             pickupMarker.remove();
@@ -234,23 +239,39 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
     }
 
 
-
-
     private void getAssignedCustomer() {
         String driverId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference assignedCustomerRef = FirebaseDatabase.getInstance().getReference().child("Users").child("Drivers").child(driverId).child("customerRequest").child("CustomerRideId");
+        DatabaseReference assignedCustomerRef = FirebaseDatabase.getInstance().getReference()
+                .child("Users")
+                .child("Drivers")
+                .child(driverId)
+                .child("customerRequest")
+                .child("customerRideId");
+
         assignedCustomerRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()){
-                    status = 1;
-                    customerId = snapshot.getValue().toString();
+                if (snapshot.exists()) {
+                    // Kiểm tra nếu dữ liệu là kiểu String
+                    customerId = snapshot.getValue(String.class);
 
-                    getAssignedCustomerPickupLocation();
-                    getAssignedCustomerDestination();
-                    getAssignedCustomerInfo();
+                    if (customerId != null) {
+
+                        status = 1;
+
+                        Log.d("CustomerID", "Customer ID: " + customerId);
+
+                        // Gọi các hàm xử lý khác
+                        getAssignedCustomerPickupLocation();
+                        getAssignedCustomerDestination();
+                        getAssignedCustomerInfo();
+                    } else {
+                        Log.e("CustomerID", "customerRideId is null or not found");
+                    }
                 }
                 else {
+                    Log.d("CustomerID", "Không tìm thấy customerRequest");
+                    // Xử lý nếu không tìm thấy customerRequest
                     // endRide();
                 }
             }
@@ -314,7 +335,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
                         mCustomerName.setText(map.get("firstName").toString());
                     }
                     if (map.get("phoneNumber") != null){
-                        mCustomerPhone.setText(map.get("phone").toString());
+                        mCustomerPhone.setText(map.get("phoneNumber").toString());
                     }
                     if (map.get("profileImageUri") != null){
                         Glide.with(getContext()).load(map.get("profileImageUri").toString()).into(mCustomerProfileImage);
@@ -335,7 +356,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
     private ValueEventListener assignedCustomerPickupLocationRefListener;
 
     private void getAssignedCustomerPickupLocation() {
-        assignedCustomerPickupLocationRef = FirebaseDatabase.getInstance().getReference().child("driversWorking").child(customerId).child("l");
+        assignedCustomerPickupLocationRef = FirebaseDatabase.getInstance().getReference().child("customerRequest").child(customerId).child("l");
         assignedCustomerPickupLocationRefListener = assignedCustomerPickupLocationRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -351,6 +372,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
                     }
 
                     LatLng pickupLatLng = new LatLng(locationLat, locationLng);
+
                     pickupMarker = mMap.addMarker(new MarkerOptions().position(pickupLatLng).title("Vị trí đón khách đây nè"));
 
                     getRouteToMaker(pickupLatLng);
@@ -365,13 +387,18 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
     }
 
     private void getRouteToMaker(LatLng pickupLatLng) {
-        Routing routing = new Routing.Builder()
-                .travelMode(AbstractRouting.TravelMode.DRIVING)
-                .withListener(this)
-                .alternativeRoutes(false)
-                .waypoints(new LatLng(mLastLoction.getLatitude(), mLastLoction.getLongitude()), pickupLatLng)
-                .build();
-        routing.execute();
+        if (newPosition != null) {
+            Routing routing = new Routing.Builder()
+                    .travelMode(AbstractRouting.TravelMode.DRIVING)
+                    .withListener(this)
+                    .alternativeRoutes(false)
+                    .waypoints(
+                            new LatLng(newPosition.latitude, newPosition.longitude),
+                            pickupLatLng
+                    )
+                    .build();
+            routing.execute();
+        }
     }
 
     private void init(){
@@ -382,12 +409,6 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
             return;
         }
 
-
-        locationRequest = new com.google.android.gms.location.LocationRequest();
-        locationRequest.setSmallestDisplacement(50f); // 50m
-        locationRequest.setInterval(15000); // 15s
-        locationRequest.setFastestInterval(10000); // 10s
-        locationRequest.setPriority(com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY);
 
         locationCallback = new LocationCallback() {
             @Override
@@ -466,12 +487,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
             }
         };
 
-        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(getContext());
-        if (ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(getContext(), getString(R.string.permission_require), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.myLooper());
+
     }
 
     @Override
@@ -484,6 +500,18 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
 
+        if (ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(getContext(), getString(R.string.permission_require), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        buildGoogleApiClient();
+        mMap.setMyLocationEnabled(true);
+//        fusedLocationProviderClient.getLastLocation().addOnSuccessListener(location ->{
+//            mLastLocation = location;
+//        });
+
+
+        // set giao dien cho map
         mMap.getUiSettings().setZoomControlsEnabled(true);
         // check permission
         Dexter.withContext(getContext())
@@ -634,25 +662,52 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         mGoogleApiClient.connect();
     }
 
+
+
+    // map update period
+    @SuppressLint("RestrictedApi")
     @Override
     public void onLocationChanged(@NonNull Location location) {
-        mLastLoction = location;
+        mLastLocation = location;
 
         LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
 
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
         mMap.animateCamera(CameraUpdateFactory.zoomTo(11));
 
-        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("driverAvailabel");
 
-        GeoFire geoFire = new GeoFire(ref);
-        geoFire.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()));
+        // bat su kien driver available tren gg map
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        DatabaseReference refAvailable = FirebaseDatabase.getInstance().getReference("availableDriver");
+        DatabaseReference refWorking = FirebaseDatabase.getInstance().getReference("driversWorking");
+
+        GeoFire geoFireAvailable = new GeoFire(refAvailable);
+        GeoFire geoFireWorking = new GeoFire(refWorking);
+
+
+        if (!customerId.equals(" ")) {
+            geoFireWorking.removeLocation(userId);
+            geoFireAvailable.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()));
+        } else {
+            geoFireAvailable.removeLocation(userId);
+            geoFireWorking.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()));
+        }
     }
 
     @Override
     public void onConnected(@Nullable Bundle bundle) {
+        locationRequest = new com.google.android.gms.location.LocationRequest();
+        locationRequest.setSmallestDisplacement(50f); // 50m
+        locationRequest.setInterval(1000); // 1s
+        locationRequest.setFastestInterval(1000); // 1s
+        locationRequest.setPriority(com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY);
 
+        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(getContext());
+        if (ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(getContext(), getString(R.string.permission_require), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.myLooper());
     }
 
     @Override
@@ -669,7 +724,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
     public void onStop() {
         super.onStop();
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("driverAvailabel");
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("availableDriver");
 
         GeoFire geoFire = new GeoFire(ref);
         geoFire.removeLocation(userId);

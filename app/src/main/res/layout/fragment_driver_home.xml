@@ -19,60 +19,69 @@
         android:layout_height="match_parent"
         />
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:id="@+id/customerInfo"
-        android:layout_gravity="top"
-        android:visibility="gone"
-        android:orientation="horizontal"
-        android:background="@color/white">
-
-        <ImageView
-            android:layout_width="100sp"
-            android:layout_height="100sp"
-            android:id="@+id/customerProfileImage"
-            android:padding="20sp"/>
+    <RelativeLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
 
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:id="@+id/customerInfo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="top"
+            android:background="@color/white"
             android:orientation="vertical"
-            android:paddingLeft="40sp">
+            android:visibility="gone"
+            >
 
-            <TextView
-                android:layout_width="wrap_content"
+            <Button
+                android:id="@+id/rideStatus"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:id="@+id/customerDestination"
-                android:paddingBottom="10sp"
-                android:text="Vị trí tại --"/>
+                android:text="Đón khách hàng..."
+                android:layout_gravity="center">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:id="@+id/customerName"
-                android:paddingBottom="10sp"
-                android:paddingTop="20sp"/>
+            </Button>
 
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:id="@+id/customerPhone"
-                android:paddingBottom="10sp"
-                android:paddingTop="20sp"/>
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/customerProfileImage"
+                    android:layout_width="100sp"
+                    android:layout_height="100sp"
+                    android:padding="20sp"
+                    android:src="@mipmap/ic_launcher"/>
+
+                <TextView
+                    android:id="@+id/customerDestination"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="10sp"
+                    android:text="Vị trí tại --" />
+
+                <TextView
+                    android:id="@+id/customerName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="20sp"
+                    android:paddingBottom="10sp" />
+
+                <TextView
+                    android:id="@+id/customerPhone"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="20sp"
+                    android:paddingBottom="10sp" />
+
+            </LinearLayout>
+
 
         </LinearLayout>
 
-        <Button
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Đón khách hàng..."
-            android:id="@+id/rideStatus">
 
-
-        </Button>
-
-    </LinearLayout>
+    </RelativeLayout>
 
 </com.sothree.slidinguppanel.SlidingUpPanelLayout>
 

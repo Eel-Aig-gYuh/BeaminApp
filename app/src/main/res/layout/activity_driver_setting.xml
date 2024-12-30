@@ -31,28 +31,26 @@
                     android:layout_gravity="right"
                     android:layout_marginRight="30dp"/>
 
-                <com.google.android.material.textfield.TextInputLayout
+                <RadioGroup
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="20dp"
                     android:layout_gravity="left"
                     android:id="@+id/rdo_type_car">
 
-                    <com.google.android.material.radiobutton.MaterialRadioButton
+                    <RadioButton
                         android:id="@+id/type_motorbike"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="@string/type_motorbike" />
+                        android:text="@string/type_motorbike" />
 
-                    <com.google.android.material.radiobutton.MaterialRadioButton
+                    <RadioButton
                         android:id="@+id/type_car"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="@string/type_car" />
+                        android:text="@string/type_car" />
 
-                </com.google.android.material.textfield.TextInputLayout>
-
-
+                </RadioGroup>
             </LinearLayout>
 
 

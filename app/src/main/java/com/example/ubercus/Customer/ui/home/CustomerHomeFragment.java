@@ -1,5 +1,7 @@
 package com.example.ubercus.Customer.ui.home;
 
+import static com.firebase.ui.auth.AuthUI.getApplicationContext;
+
 import android.Manifest;
 import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
@@ -48,6 +50,8 @@ import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
 import com.firebase.geofire.GeoQuery;
 import com.firebase.geofire.GeoQueryEventListener;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.GeofencingRequest;
@@ -103,15 +107,25 @@ import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.Observable;
 import io.reactivex.disposables.CompositeDisposable;
 
-public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback, IFirebaseDriverInfoListener, IFirebaseFailedListener, LocationListener {
+public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback, LocationListener, GoogleApiClient.OnConnectionFailedListener, GoogleApiClient.ConnectionCallbacks, IFirebaseDriverInfoListener, IFirebaseFailedListener {
+
+    // map update period
     private GoogleMap mMap;
+    Location mLastLocation;
+    LocationRequest locationRequest;
+    private FusedLocationProviderClient fusedLocationProviderClient;
+    GoogleApiClient mGoogleApiClient;
+
+
+
+
     private FragmentCustomerHomeBinding binding;
 
     private SlidingUpPanelLayout slidingUpPanelLayout;
 
     // location
-    private FusedLocationProviderClient fusedLocationProviderClient;
-    private LocationRequest locationRequest;
+
+
     private LocationCallback locationCallback;
     
     SupportMapFragment mapFragment;
@@ -136,7 +150,6 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
 
     private boolean firstTime=true;
     private String cityName;
-    private Location mLastLocation;
 
     private LinearLayout mDriverInfo;
     private ImageView mDriverProfileImage;
@@ -187,12 +200,12 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
 
                     DatabaseReference ref = FirebaseDatabase.getInstance().getReference("customerRequest");
                     GeoFire geoFire = new GeoFire(ref);
-                    geoFire.setLocation(userId, new GeoLocation(currentLocation.getLatitude(), currentLocation.getLongitude()));
+                    geoFire.setLocation(userId, new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
 
-                    pickupLocation = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
+                    pickupLocation = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
                     mMap.addMarker(new MarkerOptions().position(pickupLocation).title("Đón tôi ở đây nè "));
 
-                    mRequest.setText("Đang chờ phản hồi ...");
+                    mRequest.setText("Đặt xe ở đây nè ...");
 
                     mDriverInfo.setVisibility(View.GONE);
                     mDriverName.setText("");
@@ -219,9 +232,9 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
 
                     DatabaseReference ref = FirebaseDatabase.getInstance().getReference("customerRequest");
                     GeoFire geoFire = new GeoFire(ref);
-                    geoFire.setLocation(userId, new GeoLocation(currentLocation.getLatitude(), currentLocation.getLongitude()));
+                    geoFire.setLocation(userId, new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
 
-                    pickupLocation = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
+                    pickupLocation = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
                     pickupMarker = mMap.addMarker(new MarkerOptions().position(pickupLocation).title("Đón tôi ở đây !")
                     );
                     //.icon(BitmapDescriptorFactory.fromResource(R.drawable.baseline_directions_car_24))
@@ -287,10 +300,11 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
     private String destination;
 
     private void getClosestDriver() {
-        DatabaseReference driverLocation = FirebaseDatabase.getInstance().getReference().child(Common.DRIVERS_LOCATION_REFERENCES);
+        DatabaseReference driverLocation = FirebaseDatabase.getInstance().getReference().child("availableDriver");
         GeoFire geoFire = new GeoFire(driverLocation);
 
         geoQuery = geoFire.queryAtLocation(new GeoLocation(pickupLocation.latitude, pickupLocation.longitude), radius);
+
         geoQuery.removeAllListeners();
 
         geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
@@ -304,27 +318,34 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                         public void onDataChange(@NonNull DataSnapshot snapshot) {
                             if (snapshot.exists() && snapshot.getChildrenCount()>0){
                                 Map<String, Object> driverMap = (Map<String, Object>) snapshot.getValue();
+                                // neu da co driver thi khong lam
                                 if (isDriverFound){
                                     return;
                                 }
 
 
-                                if (driverMap.get("service").equals(requestService.toString())){
-                                    isDriverFound = true;
-                                    driverFoundId = snapshot.getKey();
+                                if (driverMap.get("service").toString() != null){
+                                    if (driverMap.get("service").equals(requestService.toString())){
+                                        if (!isDriverFound){
+                                            isDriverFound = true;
+                                            driverFoundId = snapshot.getKey();
 
-                                    DatabaseReference driverRef = FirebaseDatabase.getInstance().getReference().child("Users").child("Drivers").child(driverFoundId).child("customerRequest");
-                                    String customerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-                                    HashMap map = new HashMap();
-                                    map.put("customerRideId", customerId);
-                                    map.put("destination", destination);
-                                    driverRef.updateChildren(map);
+                                            DatabaseReference driverRef = FirebaseDatabase.getInstance().getReference().child("Users").child("Drivers").child(driverFoundId).child("customerRequest");
+                                            String customerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                                            HashMap map = new HashMap();
+                                            map.put("customerRideId", customerId);
 
+                                            driverRef.updateChildren(map);
 
-                                    getDriverLocation();
-                                    getDriverInfo();
-                                    // getHasRideEnded();
-                                    mRequest.setText("Đã tìm thấy tài xế, đang tìm vị trí...");
+                                            // add marker.
+                                            // Marker pickupDriverMarker = mMap.addMarker(new MarkerOptions().position().title("Tài xế của bạn ở đây !"));
+
+                                            getDriverLocation();
+                                            getDriverInfo();
+                                            // getHasRideEnded();
+                                            mRequest.setText("Đã tìm thấy tài xế, đang tìm vị trí...");
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -408,6 +429,9 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                     if (map.get(1) != null){
                         locationLng = Double.parseDouble(map.get(1).toString());
                     }
+
+                    // locationLat = 37.3028333;
+                    // locationLng = -121.90466;
                     LatLng driverLatLng = new LatLng(locationLat, locationLng);
 
                     if (mDriverMarker != null){
@@ -424,14 +448,12 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
 
                     float distance = loc1.distanceTo(loc2);
 
-                    if (distance<100){
+                    if (distance<50){
                         mRequest.setText("Tài xế tới rồi nè !");
                     } else {
-                        mRequest.setText("Tìm thấy tài xế rồi nè, vị trí: " + String.valueOf(distance));
+                        mRequest.setText("Tìm thấy tài xế rồi nè, khoảng cách: " + String.valueOf(distance));
                     }
-
                     mDriverMarker = mMap.addMarker(new MarkerOptions().position(driverLatLng).title("Tài xế của bạn nè"));
-
                 }
             }
 
@@ -485,10 +507,10 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
         GeoFire geoFire = new GeoFire(ref);
         geoFire.removeLocation(userId);
 
-        if(pickupMarker != null){
-            pickupMarker.remove();
-        }
-        mRequest.setText("Đặt xe ở đây nè...");
+//        if(pickupMarker != null){
+//            pickupMarker.remove();
+//        }
+        mRequest.setText("Đặt xe ở đây nè ...");
     }
 
     private void initViews(View root) {
@@ -534,8 +556,8 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
 
         locationRequest = new com.google.android.gms.location.LocationRequest();
         locationRequest.setSmallestDisplacement(10f);
-        locationRequest.setInterval(5000);
-        locationRequest.setFastestInterval(3000);
+        locationRequest.setInterval(1000);
+        locationRequest.setFastestInterval(1000);
         locationRequest.setPriority(com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY);
 
         locationCallback = new LocationCallback() {
@@ -604,7 +626,7 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
             return;
         }
         fusedLocationProviderClient.getLastLocation()
-                .addOnFailureListener(e -> Snackbar.make(getView(), e.getMessage(), Snackbar.LENGTH_SHORT).show())
+                .addOnFailureListener(e -> Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_SHORT).show())
                 .addOnSuccessListener(new OnSuccessListener<Location>() {
                     @Override
                     public void onSuccess(Location location) {
@@ -619,8 +641,7 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                                 if (cityName == null) cityName = addressList.get(0).getSubLocality();
                                 // query
                                 DatabaseReference driver_location_ref = FirebaseDatabase.getInstance()
-                                        .getReference(Common.DRIVERS_LOCATION_REFERENCES)
-                                        .child(cityName);
+                                        .getReference(Common.DRIVERS_LOCATION_REFERENCES);
 
                                 GeoFire geoFire = new GeoFire(driver_location_ref);
                                 GeoQuery geoQuery = geoFire.queryAtLocation(
@@ -651,7 +672,7 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                                         }
                                         else{
                                             distance=1.0;
-                                            addDriverMarker();
+                                            // addDriverMarker();
                                         }
                                     }
 
@@ -675,8 +696,8 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                                         newDriverLocation.setLatitude(geoLocation.latitude);
                                         newDriverLocation.setLongitude(geoLocation.longitude);
                                         float newdistance = location.distanceTo(newDriverLocation) / 1000; // in km
-                                        if (newdistance <= LIMIT_RANGE)
-                                            findDriverByKey(driverGeoModel); // if driver in range add to map
+                                        // if (newdistance <= LIMIT_RANGE)
+                                            // findDriverByKey(driverGeoModel); // if driver in range add to map
                                     }
 
                                     @Override
@@ -704,7 +725,7 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                                 Toast.makeText(getContext(), getString(R.string.city_name_empty), Toast.LENGTH_SHORT).show();;
 
                         } catch (IOException e) {
-                            Snackbar.make(getView(), e.getMessage(), Snackbar.LENGTH_SHORT).show();
+                            // Snackbar.make(getView(), e.getMessage(), Snackbar.LENGTH_SHORT).show();
                         }
                     }
                 });
@@ -726,14 +747,14 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                     });
         }
         else{
-            Toast.makeText(getContext(), getString(R.string.drivers_not_found), Toast.LENGTH_SHORT).show();
+            // Toast.makeText(getContext(), getString(R.string.drivers_not_found), Toast.LENGTH_SHORT).show();
             // Snackbar.make(getView(), getString(R.string.drivers_not_found), Snackbar.LENGTH_SHORT).show();
         }
     }
 
     private void findDriverByKey(DriverGeoModel driverGeoModel) {
         FirebaseDatabase.getInstance()
-                .getReference(Common.DRIVERS_INFO_REFERENCES)
+                .getReference("Users").child(Common.DRIVERS_INFO_REFERENCES)
                 .child(driverGeoModel.getKey())
                 .addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
@@ -755,6 +776,15 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
 
     }
 
+    protected synchronized void buildGoogleApiClient(){
+        mGoogleApiClient = new GoogleApiClient.Builder(getContext())
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .build();
+
+        mGoogleApiClient.connect();
+    }
 
     @Override
     public void onDestroyView() {
@@ -766,6 +796,18 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
 
+        if (ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(getContext(), getString(R.string.permission_require), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        buildGoogleApiClient();
+        mMap.setMyLocationEnabled(true);
+        fusedLocationProviderClient.getLastLocation().addOnSuccessListener(location ->{
+            mLastLocation = location;
+        });
+
+
+        // set giao dien
         mMap.getUiSettings().setZoomControlsEnabled(true);
         // check permission
         Dexter.withContext(getContext())
@@ -1012,23 +1054,50 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
         Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();;
     }
 
+
+
+
+
+
+    @SuppressLint("RestrictedApi")
     @Override
     public void onLocationChanged(@NonNull Location location) {
-        currentLocation = location;
         mLastLocation = location;
+        currentLocation = location;
 
         LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
 
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
         mMap.animateCamera(CameraUpdateFactory.zoomTo(11));
 
-        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("driverAvailable");
-
-        GeoFire geoFire = new GeoFire(ref);
-        geoFire.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()));
     }
 
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+
+        locationRequest = new com.google.android.gms.location.LocationRequest();
+        locationRequest.setSmallestDisplacement(50f); // 50m
+        locationRequest.setInterval(1000); // 1s
+        locationRequest.setFastestInterval(1000); // 1s
+        locationRequest.setPriority(com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY);
+
+        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(getContext());
+        if (ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(getContext(), getString(R.string.permission_require), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.myLooper());
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
 
 
     // autoComplete

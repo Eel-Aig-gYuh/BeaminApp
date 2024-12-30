@@ -232,7 +232,7 @@ public class DriverHomeActivity extends AppCompatActivity {
         TextView txt_start = (TextView) headerView.findViewById(R.id.txt_start);
         img_avatar = (ImageView) headerView.findViewById(R.id.img_avatar);
 
-        txt_name.setText(Common.buildWelcomeMessage());
+        txt_name.setText(Common.buildDriverWelcomeMessage());
         txt_phone.setText(Common.currenDriver != null ? Common.currenDriver.getPhoneNumber() : "");
         txt_start.setText(Common.currenDriver != null ? String.valueOf(Common.currenDriver.getRating()) : "0.0");
 

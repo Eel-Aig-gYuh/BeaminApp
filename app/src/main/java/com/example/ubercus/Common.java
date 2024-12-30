@@ -59,6 +59,15 @@ public class Common {
         else
             return "";
     }
+    public static String buildDriverWelcomeMessage() {
+        if (Common.currenDriver != null)
+            return new StringBuilder("Xin chào ")
+                    .append(Common.currenDriver.getFirstName())
+                    .append(" ")
+                    .append(Common.currenDriver.getLastName()).toString();
+        else
+            return "";
+    }
 
     public static void showNotification(Context context, int id,
                                         String title, String body, Intent intent) {

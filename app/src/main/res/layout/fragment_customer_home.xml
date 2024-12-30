@@ -55,11 +55,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:padding="16dp"
-                android:layout_margin="20dp"
+                android:padding="10dp"
                 android:background="@color/colorPrimaryDark"
-                android:text="Đặt xe ở đây nè ..."
-                android:textSize="20dp">
+                android:text="Đặt xe ở đây nè ...">
             </Button>
 
             <TextView
