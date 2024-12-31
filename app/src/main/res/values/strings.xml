@@ -38,6 +38,10 @@
     <string name="car_number">Biển số xe</string>
     <string name="type_motorbike">Xe máy</string>
     <string name="type_car">Xe hơi</string>
+    <string name="rideId">"Mã đã đặt "</string>
+    <string name="timeStamp">Thời gian</string>
+    <string name="prices">Giá</string>
+    <string name="payHere">Thanh toán ở đây.</string>
 
 
 </resources>

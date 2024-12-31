@@ -28,6 +28,9 @@ import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.bumptech.glide.Glide;
@@ -82,7 +85,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, RoutingListener, LocationListener {
+public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, RoutingListener, com.google.android.gms.location.LocationListener {
     // update map period
     private GoogleMap mMap;
     Location mLastLocation;
@@ -142,6 +145,8 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         registerOnlineSystem();
     }
     private void registerOnlineSystem(){
+
+
         onlineRef.addValueEventListener(onlineValueEventListener);
     }
 
@@ -174,6 +179,8 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
                         if (destinationLatLng.latitude!=0.0 && destinationLatLng.longitude!=0.0){
                             getRouteToMaker(destinationLatLng);
                         }
+
+
                         mRideStatus.setText("Hoàn thành rồi!");
 
                         break;
@@ -191,6 +198,18 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         return root;
     }
 
+    public class SharedViewModel extends ViewModel {
+        private final MutableLiveData<String> sharedData = new MutableLiveData<>();
+
+        public void setSharedData(String data) {
+            sharedData.setValue(data);
+        }
+
+        public LiveData<String> getSharedData() {
+            return sharedData;
+        }
+    }
+
     private void endRide() {
         mRideStatus.setText("Kết thúc chuyến đi.");
         erasePolylines();
@@ -198,7 +217,6 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         DatabaseReference driverRef = FirebaseDatabase.getInstance().getReference().child("Users").child("Drivers").child(userId).child("customerRequest");
         driverRef.setValue(true);
-
 
         DatabaseReference ref = FirebaseDatabase.getInstance().getReference("customerRequest");
         GeoFire geoFire = new GeoFire(ref);
@@ -208,9 +226,11 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         if(pickupMarker != null){
             pickupMarker.remove();
         }
+
         if (assignedCustomerPickupLocationRefListener != null){
             assignedCustomerPickupLocationRef.removeEventListener(assignedCustomerPickupLocationRefListener);
         }
+
         mCustomerInfo.setVisibility(View.GONE);
         mCustomerName.setText("");
         mCustomerPhone.setText("");
@@ -219,7 +239,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
     }
 
 
-
+    double price_per_call;
     private void recordRide(){
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         DatabaseReference driverRef = FirebaseDatabase.getInstance().getReference().child("Users").child("Drivers").child(userId).child("history");
@@ -234,8 +254,22 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         HashMap map = new HashMap();
         map.put("driver", userId);
         map.put("customer", customerId);
+        map.put("destination", cityName);
+        map.put("location/from/lat", newPosition.latitude);
+        map.put("location/from/lng", newPosition.longitude);
+
+        map.put("location/to/lat", pickupLatLng.latitude);
+        map.put("location/to/lng", pickupLatLng.longitude);
+
         map.put("rating", 0);
+        map.put("time", getCurrentTimeStamp());
+        map.put("prices", price_per_call);
         historyRef.child(requestId).updateChildren(map);
+    }
+
+    private Long getCurrentTimeStamp() {
+        Long timeStamp = System.currentTimeMillis()/1000;
+        return timeStamp;
     }
 
 
@@ -272,7 +306,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
                 else {
                     Log.d("CustomerID", "Không tìm thấy customerRequest");
                     // Xử lý nếu không tìm thấy customerRequest
-                    // endRide();
+                    endRide();
                 }
             }
 
@@ -351,7 +385,32 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         });
     }
 
+
+    private void getDriverCurrentLocation() {
+        if (ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(getContext(), "Unable to get current location.", Toast.LENGTH_SHORT).show();
+
+        }
+
+        fusedLocationProviderClient.getLastLocation()
+                .addOnSuccessListener(location -> {
+                    if (location != null) {
+                        mLastLocation = location;
+                        // mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15));
+
+                        // Hiển thị marker trên bản đồ
+                        // mMap.addMarker(new MarkerOptions().position(currentLatLng).title("Driver Location"));
+                    } else {
+                        Toast.makeText(getContext(), "Unable to get current location.", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
     Marker pickupMarker;
+    LatLng pickupLatLng;
     private DatabaseReference assignedCustomerPickupLocationRef;
     private ValueEventListener assignedCustomerPickupLocationRefListener;
 
@@ -371,9 +430,29 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
                         locationLng = Double.parseDouble(map.get(1).toString());
                     }
 
-                    LatLng pickupLatLng = new LatLng(locationLat, locationLng);
+                    pickupLatLng = new LatLng(locationLat, locationLng);
+
+                    // tinh tien cua mot chuyen di
+                    Location loc1 = new Location("");
+                    loc1.setLatitude(locationLat);
+                    loc1.setLongitude(locationLng);
+
+                    Location loc2 = new Location("");
+                    loc2.setLatitude(newPosition.latitude);
+                    loc2.setLongitude(newPosition.longitude);
+
+                    float distance = loc1.distanceTo(loc2);
+                    price_per_call = 0.0;
+                    if (currentService.equals("Xe hơi"))
+                        price_per_call = price_per_call * 10000;
+                    else
+                        price_per_call = price_per_call * 5000;
 
                     pickupMarker = mMap.addMarker(new MarkerOptions().position(pickupLatLng).title("Vị trí đón khách đây nè"));
+
+                    // getDriverCurrentLocation();
+//                    Log.d("Routing: ", "dia diem pick up routing" + pickupLatLng);
+//                    Log.d("Routing", "dia diem hien tai driver" + newPosition.latitude + "," + newPosition.longitude);
 
                     getRouteToMaker(pickupLatLng);
                 }
@@ -386,20 +465,96 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         });
     }
 
-    private void getRouteToMaker(LatLng pickupLatLng) {
-        if (newPosition != null) {
-            Routing routing = new Routing.Builder()
-                    .travelMode(AbstractRouting.TravelMode.DRIVING)
-                    .withListener(this)
-                    .alternativeRoutes(false)
-                    .waypoints(
-                            new LatLng(newPosition.latitude, newPosition.longitude),
-                            pickupLatLng
-                    )
-                    .build();
-            routing.execute();
-        }
+    private String currentService = "";
+    private void getDriverService() {
+        String driverId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+
+        DatabaseReference serviceRef = FirebaseDatabase.getInstance()
+                .getReference("Users")
+                .child("Drivers")
+                .child(driverId)
+                .child("service");
+
+        // Lắng nghe dữ liệu từ Firebase
+        serviceRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    String service = snapshot.getValue(String.class);
+                } else {
+                    Toast.makeText(getContext(), "Không lấy được service rồi", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
     }
+
+    // khong phai billing account thi khong ve duoc
+    private void getRouteToMaker(LatLng pickupLatLng) {
+        if (pickupLatLng == null || newPosition == null) {
+            Log.e("Routing", "pickupLatLng hoặc mLastLocation bị null");
+            return;
+        }
+
+        Routing routing = new Routing.Builder()
+                .travelMode(AbstractRouting.TravelMode.DRIVING)
+                .withListener(new RoutingListener() {
+                    @Override
+                    public void onRoutingFailure(RouteException e) {
+                        if (e != null) {
+                            Log.e("Routing", "Routing thất bại: " + e.getMessage());
+                        } else {
+                            Log.e("Routing", "Routing thất bại: Không rõ nguyên nhân");
+                        }
+                    }
+
+                    @Override
+                    public void onRoutingStart() {
+                        Log.d("Routing", "Bắt đầu tạo tuyến đường...");
+                    }
+
+                    @Override
+                    public void onRoutingSuccess(ArrayList<Route> route, int shortestRouteIndex) {
+                        Log.d("Routing", "Tuyến đường thành công!");
+
+                        // Xóa tuyến đường cũ (nếu có)
+                        if (polylines != null) {
+                            for (Polyline polyline : polylines) {
+                                polyline.remove();
+                            }
+                        }
+                        polylines = new ArrayList<>();
+
+                        // Hiển thị tuyến đường lên bản đồ
+                        for (int i = 0; i < route.size(); i++) {
+                            int colorIndex = i % COLORS.length;
+                            PolylineOptions polylineOptions = new PolylineOptions();
+                            polylineOptions.color(getResources().getColor(COLORS[colorIndex]));
+                            polylineOptions.width(10 + i * 3);
+                            polylineOptions.addAll(route.get(i).getPoints());
+                            Polyline polyline = mMap.addPolyline(polylineOptions);
+                            polylines.add(polyline);
+
+                            Log.d("Routing", "Tuyến đường " + (i + 1) + ": Khoảng cách - " + route.get(i).getDistanceValue() + "m");
+                        }
+                    }
+
+                    @Override
+                    public void onRoutingCancelled() {
+                        Log.d("Routing", "Routing bị hủy.");
+                    }
+                })
+                .alternativeRoutes(false)
+                .waypoints(new LatLng(newPosition.latitude, newPosition.longitude), pickupLatLng)
+                .key(String.valueOf(R.string.myApiKeys))
+                .build();
+
+        routing.execute();
+    }
+
+    String cityName;
 
     private void init(){
         onlineRef = FirebaseDatabase.getInstance().getReference().child(".info/connected");
@@ -440,7 +595,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
                         break;
                 }
 
-
+                // mLastLocation = locationResult.getLocations().get(0);
 
                 // sau khi co duoc vi tri thi se lay dia chi
                 Geocoder geocoder = new Geocoder(getContext(), Locale.getDefault());
@@ -449,7 +604,7 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
                     // lay thanh pho hien tai cua current user
                     addressList = geocoder.getFromLocation(locationResult.getLastLocation().getLatitude(),
                             locationResult.getLastLocation().getLongitude(), 1);
-                    String cityName = addressList.get(0).getLocality();
+                    cityName = addressList.get(0).getLocality();
                     if (cityName==null) cityName = addressList.get(0).getSubLocality();
 
 
@@ -665,7 +820,6 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
 
 
     // map update period
-    @SuppressLint("RestrictedApi")
     @Override
     public void onLocationChanged(@NonNull Location location) {
         mLastLocation = location;
@@ -685,13 +839,30 @@ public class DriverHomeFragment extends Fragment implements OnMapReadyCallback, 
         GeoFire geoFireWorking = new GeoFire(refWorking);
 
 
-        if (!customerId.equals(" ")) {
-            geoFireWorking.removeLocation(userId);
-            geoFireAvailable.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()));
-        } else {
-            geoFireAvailable.removeLocation(userId);
-            geoFireWorking.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()));
+        Log.d("CustomerID", "switch workings" + customerId);
+
+        switch (customerId){
+            case "":
+                geoFireAvailable.removeLocation(userId);
+                geoFireWorking.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()));
+
+                break;
+
+            default:
+                geoFireWorking.removeLocation(userId);
+                geoFireAvailable.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()));
+
+                break;
         }
+
+//        if (!customerId.equals(" ")) {
+//            geoFireWorking.removeLocation(userId);
+//            geoFireAvailable.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()));
+//
+//        } else {
+//            geoFireAvailable.removeLocation(userId);
+//            geoFireWorking.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()));
+//        }
     }
 
     @Override

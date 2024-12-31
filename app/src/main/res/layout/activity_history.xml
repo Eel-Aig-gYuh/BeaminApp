@@ -13,18 +13,21 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
-
-
-
-        <Button
-
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:id="@+id/pay"
-            android:text="Thanh toán ở đây nè"
-            android:visibility="gone">
+            android:layout_height="match_parent">
 
-        </Button>
+            <androidx.recyclerview.widget.RecyclerView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/historyRecycleView"
+                android:scrollbars="vertical">
+
+
+            </androidx.recyclerview.widget.RecyclerView>
+
+        </androidx.core.widget.NestedScrollView>
+
     </LinearLayout>
 
 </androidx.core.widget.NestedScrollView>

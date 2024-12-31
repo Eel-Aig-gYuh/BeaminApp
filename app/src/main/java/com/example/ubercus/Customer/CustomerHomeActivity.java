@@ -207,13 +207,13 @@ public class CustomerHomeActivity extends AppCompatActivity {
             // nut lich su
             if (item.getItemId() == R.id.nav_history){
                 Intent intent = new Intent(CustomerHomeActivity.this, HistoryActivity.class);
+                intent.putExtra("customerOrDriver", "Customers");
                 startActivity(intent);
             }
             // cai dat thong tin
             if (item.getItemId() == R.id.nav_setting){
                 Intent intent = new Intent(CustomerHomeActivity.this, CustomerSettingActivity.class);
                 startActivity(intent);
-
             }
             return true;
         });

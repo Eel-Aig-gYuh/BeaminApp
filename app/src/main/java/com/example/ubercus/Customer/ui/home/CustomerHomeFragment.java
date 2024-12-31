@@ -35,6 +35,9 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.bumptech.glide.Glide;
+import com.directions.route.Route;
+import com.directions.route.RouteException;
+import com.directions.route.RoutingListener;
 import com.example.ubercus.Callback.IFirebaseDriverInfoListener;
 import com.example.ubercus.Callback.IFirebaseFailedListener;
 import com.example.ubercus.Common;
@@ -96,6 +99,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -107,7 +111,7 @@ import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.Observable;
 import io.reactivex.disposables.CompositeDisposable;
 
-public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback, LocationListener, GoogleApiClient.OnConnectionFailedListener, GoogleApiClient.ConnectionCallbacks, IFirebaseDriverInfoListener, IFirebaseFailedListener {
+public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback, LocationListener, GoogleApiClient.OnConnectionFailedListener, GoogleApiClient.ConnectionCallbacks, RoutingListener, IFirebaseDriverInfoListener, IFirebaseFailedListener {
 
     // map update period
     private GoogleMap mMap;
@@ -194,16 +198,30 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
             @Override
             public void onClick(View v) {
                 if (requestBol){
-                    String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                    geoQuery.removeAllListeners();
+                    driverLocationRef.removeEventListener(driverLocationRefListener);
+
+                    if (driverFoundId != null){
+                        DatabaseReference driverRef = FirebaseDatabase.getInstance().getReference("Users").child("Drivers").child(driverFoundId);
+
+                        driverRef.setValue(true);
+                        driverRef = null;
+                    }
+
                     radius = 1;
                     isDriverFound = false;
 
+                    String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
                     DatabaseReference ref = FirebaseDatabase.getInstance().getReference("customerRequest");
                     GeoFire geoFire = new GeoFire(ref);
-                    geoFire.setLocation(userId, new GeoLocation(mLastLocation.getLatitude(), mLastLocation.getLongitude()));
+                    geoFire.removeLocation(userId);
 
-                    pickupLocation = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
-                    mMap.addMarker(new MarkerOptions().position(pickupLocation).title("Đón tôi ở đây nè "));
+                    if (pickupMarker!=null){
+                        pickupMarker.remove();
+                    }
+                    if (mDriverMarker!=null){
+                        mDriverMarker.remove();
+                    }
 
                     mRequest.setText("Đặt xe ở đây nè ...");
 
@@ -323,7 +341,6 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                                     return;
                                 }
 
-
                                 if (driverMap.get("service").toString() != null){
                                     if (driverMap.get("service").equals(requestService.toString())){
                                         if (!isDriverFound){
@@ -334,6 +351,24 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                                             String customerId = FirebaseAuth.getInstance().getCurrentUser().getUid();
                                             HashMap map = new HashMap();
                                             map.put("customerRideId", customerId);
+
+                                            String cityName = "";
+                                            Geocoder geocoder = new Geocoder(getContext(), Locale.getDefault());
+                                            List<Address> addressList ;
+                                            try {
+                                                // lay thanh pho hien tai cua current user
+                                                addressList = geocoder.getFromLocation(mLastLocation.getLatitude(),
+                                                        mLastLocation.getLongitude(), 1);
+                                                cityName = addressList.get(0).getLocality();
+                                                if (cityName == null)
+                                                    cityName = addressList.get(0).getSubLocality();
+                                            } catch (IOException e){
+
+                                            }
+                                            map.put("customerRideId", customerId);
+                                            map.put("destination", cityName);
+                                            map.put("destinationLat", mLastLocation.getLatitude());
+                                            map.put("destinationLng", mLastLocation.getLongitude());
 
                                             driverRef.updateChildren(map);
 
@@ -357,27 +392,26 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
             }
 
             @Override
-            public void onKeyExited(String key) {
-
-            }
+            public void onKeyExited(String key) {}
 
             @Override
-            public void onKeyMoved(String key, GeoLocation location) {
-
-            }
+            public void onKeyMoved(String key, GeoLocation location) {}
 
             @Override
             public void onGeoQueryReady() {
                 if (!isDriverFound){
-                    radius++;
-                    getClosestDriver();
+                    if (radius < 10000){
+                        radius++;
+                        getClosestDriver();
+                    }
+                    else {
+                        Toast.makeText(getContext(), "Không có xe ở gần rồi!", Toast.LENGTH_SHORT).show();
+                    }
                 }
             }
 
             @Override
-            public void onGeoQueryError(DatabaseError error) {
-
-            }
+            public void onGeoQueryError(DatabaseError error) {}
         });
     }
 
@@ -398,14 +432,11 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                     if (map.get("profileImageUri") != null){
                         Glide.with(getContext()).load(map.get("profileImageUri").toString()).into(mDriverProfileImage);
                     }
-
                 }
             }
 
             @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-
-            }
+            public void onCancelled(@NonNull DatabaseError error) {}
         });
     }
 
@@ -584,7 +615,10 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
                 }
 
                 if (previousLocation.distanceTo(currentLocation)/1000 <= LIMIT_RANGE) // display driver
+                {
                     loadAvailableDrivers();
+                    Log.d("Routing", "vi tri hien tai" + previousLocation);
+                }
                 else
                 {
                     // do nothing
@@ -1055,10 +1089,6 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
     }
 
 
-
-
-
-
     @SuppressLint("RestrictedApi")
     @Override
     public void onLocationChanged(@NonNull Location location) {
@@ -1094,8 +1124,24 @@ public class CustomerHomeFragment extends Fragment implements OnMapReadyCallback
         fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.myLooper());
     }
 
+
+    // ve duong di
     @Override
-    public void onConnectionSuspended(int i) {
+    public void onConnectionSuspended(int i) {}
+
+    @Override
+    public void onRoutingFailure(RouteException e) {}
+
+    @Override
+    public void onRoutingStart() {}
+
+    @Override
+    public void onRoutingSuccess(ArrayList<Route> arrayList, int i) {
+
+    }
+
+    @Override
+    public void onRoutingCancelled() {
 
     }
 

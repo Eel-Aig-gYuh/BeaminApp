@@ -8,23 +8,48 @@ import android.widget.Button;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.ubercus.History.HistoryObject;
 import com.example.ubercus.R;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import com.paypal.android.sdk.payments.PayPalConfiguration;
 import com.paypal.android.sdk.payments.PayPalPayment;
 import com.paypal.android.sdk.payments.PayPalService;
 import com.paypal.android.sdk.payments.PaymentActivity;
 
 import java.math.BigDecimal;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Calendar;
+import java.util.Locale;
 
 public class HistoryActivity extends AppCompatActivity {
+    private String customerOrDriver;
+    private String userId;
 
+    private RecyclerView mHistoryRecycleView;
+    private RecyclerView.Adapter mHistoryAdapter;
+    private RecyclerView.LayoutManager mHistoryLayoutManager;
     private Button mPay;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,61 +62,101 @@ public class HistoryActivity extends AppCompatActivity {
             return insets;
         });
 
-        Intent intent = new Intent(this, PayPalService.class);
-        intent.putExtra(PayPalService.EXTRA_PAYPAL_CONFIGURATION, config);
-        startActivity(intent);
+        mHistoryRecycleView = findViewById(R.id.historyRecycleView);
+        mHistoryRecycleView.setNestedScrollingEnabled(false);
+        mHistoryRecycleView.setHasFixedSize(true);
 
-        mPay = findViewById(R.id.pay);
+        mHistoryLayoutManager = new LinearLayoutManager(this);
+        mHistoryRecycleView.setLayoutManager(mHistoryLayoutManager);
+
+        mHistoryAdapter = new HistoryAdapter(resultsHistory, this);
+        mHistoryRecycleView.setAdapter(mHistoryAdapter);
+
+        userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+
+        if (getIntent() != null && getIntent().getExtras() != null) {
+            customerOrDriver = getIntent().getExtras().getString("customerOrDriver", "Customers");
+        } else {
+            customerOrDriver = "Customers";
+        }
+
+        getUserHistoryId();
     }
 
-
-    @Override
-    protected void onDestroy() {
-        stopService(new Intent(this, PayPalService.class));
-        super.onDestroy();
+    private ArrayList<HistoryObject> resultsHistory = new ArrayList<HistoryObject>();
+    private ArrayList<HistoryObject> getDatasetsHistory() {
+        return resultsHistory;
     }
 
-    private void displayCustomerRelatedObjects(){
-        mPay.setVisibility(View.VISIBLE);
+    private void getUserHistoryId() {
+        if (getIntent() != null && getIntent().getExtras() != null) {
+            customerOrDriver = getIntent().getExtras().getString("customerOrDriver");
+            if (customerOrDriver == null) {
+                customerOrDriver = "Customers";
+            }
+        } else {
+            customerOrDriver = "Customers";
+        }
+        DatabaseReference userHistoryDatabase = FirebaseDatabase.getInstance().getReference().child("Users").child(customerOrDriver).child(userId).child("history");
 
-        mPay.setOnClickListener(new View.OnClickListener() {
+        userHistoryDatabase.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onClick(View v) {
-                payPalPayment();
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()){
+                    for (DataSnapshot history: snapshot.getChildren()){
+                        FetchRideInformation(history.getKey());
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+
             }
         });
     }
 
-    private int PAYPAL_REQUEST_CODE = 1;
-    private static PayPalConfiguration config = new PayPalConfiguration()
-            .environment(PayPalConfiguration.ENVIRONMENT_SANDBOX)
-            .clientId(PayPalConfig.PAYPAL_CLIENT_ID);
-    private void payPalPayment() {
-        double ridePrice = 0;
-        PayPalPayment payPalPayment = new PayPalPayment(new BigDecimal(ridePrice), "VMD", "Baemin Ride",
-        PayPalPayment.PAYMENT_INTENT_SALE);
+    private void FetchRideInformation(String rideKey) {
+        DatabaseReference historyDatabase = FirebaseDatabase.getInstance().getReference().child("history").child(rideKey);
 
-        Intent intent = new Intent(this, PaymentActivity.class);
+        historyDatabase.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()){
+                    for (DataSnapshot history: snapshot.getChildren()){
+                        String rideId = snapshot.getKey();
+                        Long timeStamp = 0L;
+                        Double prices = 0.0;
 
-        intent.putExtra(PayPalService.EXTRA_PAYPAL_CONFIGURATION, config);
-        intent.putExtra(PaymentActivity.EXTRA_PAYMENT, payPalPayment);
+                        // resultsHistory.add(new HistoryObject(String.valueOf(1)));
 
-        startActivityForResult(intent, PAYPAL_REQUEST_CODE);
+                        for (DataSnapshot child: snapshot.getChildren()){
+                            if  (child.getKey().equals("timeStamp")) {
+                                timeStamp = Long.valueOf(child.getValue().toString());
+                            }
+                        }
+
+                        HistoryObject obj = new HistoryObject(rideKey, getDate(timeStamp), prices.toString());
+                        resultsHistory.add(obj);
+                        mHistoryAdapter.notifyDataSetChanged();
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+
+            }
+        });
     }
 
+    private String getDate(Long timeStamp) {
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.getDefault());
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
+        // Chuyển đổi timestamp sang Date
+        Date date = new Date(timeStamp * 1000);
 
-        if (requestCode == PAYPAL_REQUEST_CODE){
-            if (requestCode == Activity.RESULT_OK){
-
-            }
-            else{
-                Toast.makeText(this, "Thanh toám thất bại rồi !", Toast.LENGTH_SHORT).show();
-            }
-        }
-
+        // Trả về chuỗi đã định dạng
+        return sdf.format(date);
     }
 }
